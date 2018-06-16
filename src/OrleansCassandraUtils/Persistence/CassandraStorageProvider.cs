@@ -62,7 +62,7 @@ namespace OrleansCassandraUtils.Persistence
 
         async Task Init(CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrEmpty(options.ConnctionString))
+            if (string.IsNullOrEmpty(options.ConnctionString))
                 throw new BadProviderConfigException($"Connection string not specified for cassandra grain storage '{name}'.");
 
             foreach (var providerInfo in options.SerializationProviders.Values)

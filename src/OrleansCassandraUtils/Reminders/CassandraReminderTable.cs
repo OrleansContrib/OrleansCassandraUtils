@@ -21,10 +21,16 @@ namespace OrleansCassandraUtils.Reminders
         OrleansQueries queries;
 
 
-        public CassandraReminderTable(IGrainReferenceConversionProvider grainReferenceConversionProvider, IGrainReferenceConverter grainReferenceConverter, IOptions<CassandraReminderTableOptions> options)
+        public CassandraReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<CassandraReminderTableOptions> options)
         {
             this.options = options.Value;
-            this.grainReferenceConversionProvider = grainReferenceConversionProvider ?? new DefaultGrainReferenceConversionProvider(grainReferenceConverter);
+            this.grainReferenceConversionProvider = new DefaultGrainReferenceConversionProvider(grainReferenceConverter);
+        }
+
+        public CassandraReminderTable(IGrainReferenceConversionProvider grainReferenceConversionProvider, IOptions<CassandraReminderTableOptions> options)
+        {
+            this.options = options.Value;
+            this.grainReferenceConversionProvider = grainReferenceConversionProvider;
         }
 
         public async Task Init()
