@@ -33,6 +33,8 @@ new SiloHostBuilder().AddCassandraGrainStorageAsDefault((CassandraGrainStorageOp
 
 You'll notice the `AddSerializationProvider` call above is unfamiliar. This is an optional feature you can use to provide your own serialization provider, either based on existing providers in Orleans or a new one altogether. You may add up to 127 providers, each with a unique code between 0 and 126. These code may not change during the entire lifetime of a cluster, as the codes are stored alongside the data and then used to decide which deserializer to use when reading data back from the database. If you don't provide any custom serializers, Orleans' default serializer will be used. Beware however that the default serializer is **not** version-tolerant and you **will** break your entire DB if you make a change to any grain state classes. To implement a custom serializer, simply implement the `OrleansCassandraUtils.Persistence.IStorageSerializationProvider` interface.
 
+It's also worth mentioning that all grain state is serialized as binary data, since I find XML and JSON to be very inefficient, space- and perfomance-wise ([see](http://geekswithblogs.net/LeonidGaneline/archive/2015/05/06/serializers-in-.net.-v.2.aspx) [here](https://auth0.com/blog/beating-json-performance-with-protobuf/) for example). If you need text serialization, you can turn the resulting string into a UTF-8 byte sequence, though I would recommend against this approach. I prefer [Bond](https://github.com/Microsoft/bond), but you should also check out [Protobuf](https://developers.google.com/protocol-buffers/docs/overview).
+
 ### Clustering
 
 On the silo side:
