@@ -36,6 +36,7 @@
     <Compile Include="Clustering\CassandraClusteringOptions.cs" />
     <Compile Include="Clustering\CassandraGatewayListProvider.cs" />
     <Compile Include="Clustering\CassandraClusteringTable.cs" />
+    <Compile Include="GlobalSuppressions.cs" />
     <Compile Include="Reminders\CassandraReminderTable.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Reminders\CassandraReminderTableOptions.cs" />

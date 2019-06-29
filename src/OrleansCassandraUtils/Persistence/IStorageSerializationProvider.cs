@@ -16,5 +16,6 @@ namespace OrleansCassandraUtils.Persistence
         bool IsSupportedType(Type type);
         object Deserialize(Type expectedType, byte[] data);
         byte[] Serialize(object @object);
+        object CreateInstance(Type type);
     }
 }

@@ -184,7 +184,7 @@ namespace OrleansCassandraUtils.Persistence
 
             if (row == null)
             {
-                grainState.State = Activator.CreateInstance(grainStateType);
+                grainState.State = typeInfo.providerInfo.provider.CreateInstance(grainStateType);
                 grainState.ETag = null;
                 return;
             }

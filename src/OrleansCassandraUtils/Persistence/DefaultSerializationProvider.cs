@@ -39,5 +39,10 @@ namespace OrleansCassandraUtils.Persistence
         {
             return serializationManager.SerializeToByteArray(@object);
         }
+
+        public object CreateInstance(Type type)
+        {
+            return Activator.CreateInstance(type);
+        }
     }
 }

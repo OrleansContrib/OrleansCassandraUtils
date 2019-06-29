@@ -130,6 +130,18 @@ insert into queries(key, consistency_level, text) values
 		version = :expected_version;
 ');
 
+insert into queries(key, consistency_level, text) values 
+(
+	'DeleteMembershipEntryKey','one','
+	DELETE FROM 
+		membership
+	WHERE
+		partition_key = 0
+		AND address = :address
+		AND port = :port
+		AND generation = :generation;
+');
+
 insert into queries(key, consistency_level, text) values
 (
 	'GatewaysQueryKey','one','
