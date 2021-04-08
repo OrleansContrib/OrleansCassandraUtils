@@ -4,9 +4,9 @@
 
 ## How to use
 
-OrleansCassandraUtils is Orleans 2.0 compatible.
+OrleansCassandraUtils is Orleans 3.x compatible.
 
-To set it up, you first need a working Cassandra DB. Create a new keyspace and run the `InitializeOrleansDatabase.cql` script on it. Note that unlike the ADO.Net provider, you can't put data from multiple clusters into one database/keyspace. You **must** create a new keyspace for each cluster.
+To set it up, you first need a working Cassandra DB. Create a new keyspace and run the `InitializeOrleansDatabase.cql` script on it. Note that unlike the ADO.Net provider, you can't put data from multiple clusters into one database/keyspace. You must create a new keyspace for each cluster.
 
 OrleansCassandraUtils uses a custom connection string format not unlike SQL Server connection strings. The parameters (case-insensitive) are as follows:
 
@@ -23,23 +23,23 @@ Then, setup your silo as follows:
 
 ### Grain storage
 
-```
-new SiloHostBuilder().AddCassandraGrainStorageAsDefault((CassandraGrainStorageOptions o) =>
+```csharp
+siloBuilder.AddCassandraGrainStorageAsDefault((CassandraGrainStorageOptions o) =>
 {
     o.ConnctionString = myConnectionString;
     o.AddSerializationProvider(1, new MyCustomSerializationProvider());
 })
 ```
 
-You'll notice the `AddSerializationProvider` call above is unfamiliar. This is an optional feature you can use to provide your own serialization provider, either based on existing providers in Orleans or a new one altogether. You may add up to 127 providers, each with a unique code between 0 and 126. These codes must not change during the entire lifetime of a cluster, as the codes are stored alongside the data and then used to decide which deserializer to use when reading data back from the database. If you don't provide any custom serializers, Orleans' default serializer will be used. Beware however that the default serializer is **not** version-tolerant and you **will** break your entire DB if you make a change to any grain state classes. To implement a custom serializer, simply implement the `OrleansCassandraUtils.Persistence.IStorageSerializationProvider` interface.
+You'll notice the `AddSerializationProvider` call above is unfamiliar. This is an optional feature you can use to provide your own serialization provider, either based on existing providers in Orleans or a new one altogether. You may add up to 127 providers, each with a unique code between 0 and 126. These codes must not change during the entire lifetime of a cluster, as the codes are stored alongside the data and then used to decide which deserializer to use when reading data back from the database. If you don't provide any custom serializers, Orleans' default serializer will be used. Beware however that the default serializer is not version-tolerant and you *will* break your entire DB if you make a change to any grain state classes. To implement a custom serializer, simply implement the `OrleansCassandraUtils.Persistence.IStorageSerializationProvider` interface.
 
-It's also worth mentioning that all grain state is serialized as binary data, since I find XML and JSON to be very inefficient, space- and perfomance-wise ([see](http://geekswithblogs.net/LeonidGaneline/archive/2015/05/06/serializers-in-.net.-v.2.aspx) [here](https://auth0.com/blog/beating-json-performance-with-protobuf/) for example). If you need text serialization, you can turn the resulting string into a UTF-8 byte sequence, though I would recommend against this approach. I prefer [Bond](https://github.com/Microsoft/bond), but you should also check out [Protobuf](https://developers.google.com/protocol-buffers/docs/overview).
+It's also worth mentioning that all grain state is serialized as binary data, since I find XML and JSON to be very inefficient, space- and perfomance-wise ([see](http://geekswithblogs.net/LeonidGaneline/archive/2015/05/06/serializers-in-.net.-v.2.aspx) [here](https://auth0.com/blog/beating-json-performance-with-protobuf/) for example). If you need text serialization, you can turn the resulting string into a UTF-8 byte sequence. I prefer [Bond](https://github.com/Microsoft/bond), but you can also use [Protobuf](https://developers.google.com/protocol-buffers/docs/overview).
 
 ### Clustering
 
 On the silo side:
-```
-new SiloHostBuilder().UseCassandraClustering((CassandraClusteringOptions o) =>
+```csharp
+siloBuilder.UseCassandraClustering((CassandraClusteringOptions o) =>
 {
     o.ConnectionString = myConnectionString;
 })
@@ -47,8 +47,8 @@ new SiloHostBuilder().UseCassandraClustering((CassandraClusteringOptions o) =>
 
 and on the client side:
 
-```
-new ClientBuilder().UseCassandraClustering((CassandraClusteringOptions o) =>
+```csharp
+clientBuilder.UseCassandraClustering((CassandraClusteringOptions o) =>
 {
     o.ConnectionString = myConnectionString;
 })
@@ -56,8 +56,8 @@ new ClientBuilder().UseCassandraClustering((CassandraClusteringOptions o) =>
 
 ### Reminders
 
-```
-new SiloHostBuilder().UseCassandraReminderService((CassandraClusteringOptions o) =>
+```csharp
+siloBuilder.UseCassandraReminderService((CassandraClusteringOptions o) =>
 {
     o.ConnectionString = myConnectionString;
 })
@@ -67,7 +67,7 @@ new SiloHostBuilder().UseCassandraReminderService((CassandraClusteringOptions o)
 
 Cassandra clusters can be a good place to store your non-grain data as well. OrleansCassandraUtils provides the `OrleansCassandraUtils.Utils.CassandraSessionFactory` class, which you may use to acquire a Cassandra session and make custom queries against your cluster as follows:
 
-```
+```csharp
 var session = await CassandraSessionFactory.CreateSession(myConnectionString);
 var queryResults = await Session.ExecuteAsync(new SimpleStatement("select * from my_table"));
 ```

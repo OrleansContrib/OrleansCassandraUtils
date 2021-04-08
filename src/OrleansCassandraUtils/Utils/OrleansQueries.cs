@@ -1,14 +1,10 @@
-﻿using Cassandra;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
+using Cassandra;
 using Orleans;
 using Orleans.Runtime;
 using OrleansCassandraUtils.Reminders;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace OrleansCassandraUtils.Utils
 {
@@ -19,79 +15,41 @@ namespace OrleansCassandraUtils.Utils
     /// knowledge of query result columns, but I don't see the benefit right
     /// now, specially since each query is used by one class only.
     /// </summary>
-    class OrleansQueries
+    internal class OrleansQueries : Queries
     {
         const int reminderPartitionBits = 6;
 
-        static SemaphoreSlim @lock = new SemaphoreSlim(1);
-        static string readQueriesCommand = "SELECT key, text, consistency_level FROM queries;";
 
-        static Dictionary<string, PreparedStatement> queries = null;
-
-
-        public static async Task<OrleansQueries> CreateInstance(ISession session)
+        public static new async Task<OrleansQueries> CreateInstance(ISession session)
         {
-            await @lock.WaitAsync();
-
-            try
-            {
-                if (queries == null)
-                {
-                    var queryRows = await session.ExecuteAsync(new SimpleStatement(readQueriesCommand));
-
-                    var dic = new Dictionary<string, PreparedStatement>();
-                    foreach (var Row in queryRows)
-                    {
-
-                        var statement = await session.PrepareAsync((string)Row["text"]);
-                        statement.SetConsistencyLevel((ConsistencyLevel)Enum.Parse(typeof(ConsistencyLevel), (string)Row["consistency_level"], true));
-                        dic.Add(Row["key"].ToString(), statement);
-                    }
-
-                    queries = dic;
-                }
-
-                return new OrleansQueries();
-            }
-            finally
-            {
-                @lock.Release();
-            }
+            await Queries.CreateInstance(session);
+            return new OrleansQueries(session);
         }
 
 
-        private OrleansQueries() { }
+        private OrleansQueries(ISession session) : base(session) { }
 
 
-        static sbyte GetPartitionFromGrainHash(int grainDatabaseHash)
-        {
-            return (sbyte)(grainDatabaseHash >> (32 - reminderPartitionBits));
-        }
+        static sbyte GetPartitionFromGrainHash(int grainDatabaseHash) => (sbyte)(grainDatabaseHash >> (32 - reminderPartitionBits));
 
-        static int GetGrainHash(GrainReference grainRef)
-        {
-            return GetGrainHashForDatabase(grainRef.GetUniformHashCode());
-        }
+        static int GetGrainHash(GrainReference grainRef) => GetGrainHashForDatabase(grainRef.GetUniformHashCode());
 
-        static int GetGrainHashForDatabase(uint grainHash)
-        {
-            return (int)(grainHash + int.MinValue);
-        }
+        static int GetGrainHashForDatabase(uint grainHash) => (int)(grainHash + int.MinValue);
 
-        static Tuple<sbyte, int, byte[]> GetGrainKeys(GrainReference grainRef, IGrainReferenceConversionProvider grainReferenceConversionProvider)
+        static (sbyte partition, int hash, byte[] grainKey) GetGrainKeys(GrainReference grainRef, IGrainReferenceConversionProvider grainReferenceConversionProvider)
         {
             var hash = GetGrainHash(grainRef);
-            return new Tuple<sbyte, int, byte[]>(GetPartitionFromGrainHash(hash), hash, grainReferenceConversionProvider.GetKey(grainRef));
+            return (GetPartitionFromGrainHash(hash), hash, grainReferenceConversionProvider.GetKey(grainRef));
         }
 
-        public IStatement UpsertReminderRow(ReminderEntry entry, Guid eTag, IGrainReferenceConversionProvider grainReferenceConversionProvider)
+        internal IStatement UpsertReminderRow(ReminderEntry entry, Guid eTag, IGrainReferenceConversionProvider grainReferenceConversionProvider)
         {
-            var Keys = GetGrainKeys(entry.GrainRef, grainReferenceConversionProvider);
-            return queries["UpsertReminderRowKey"].Bind(new
+            var (partition, hash, grainKey) = GetGrainKeys(entry.GrainRef, grainReferenceConversionProvider);
+            return this["UpsertReminderRowKey"].Bind(new
             {
-                partition = Keys.Item1,
-                grain_hash = Keys.Item2,
-                grain_id = Keys.Item3,
+                partition = partition,
+                grain_hash = hash,
+                grain_id = grainKey,
                 reminder_name = entry.ReminderName,
                 start_time = entry.StartAt,
                 period = (int)entry.Period.TotalMilliseconds,
@@ -99,38 +57,38 @@ namespace OrleansCassandraUtils.Utils
             });
         }
 
-        public IStatement ReadReminderRow(GrainReference grainRef, string reminderName, IGrainReferenceConversionProvider grainReferenceConversionProvider)
+        internal IStatement ReadReminderRow(GrainReference grainRef, string reminderName, IGrainReferenceConversionProvider grainReferenceConversionProvider)
         {
-            var Keys = GetGrainKeys(grainRef, grainReferenceConversionProvider);
-            return queries["ReadReminderRowKey"].Bind(new
+            var (partition, hash, grainKey) = GetGrainKeys(grainRef, grainReferenceConversionProvider);
+            return this["ReadReminderRowKey"].Bind(new
             {
-                partition = Keys.Item1,
-                grain_hash = Keys.Item2,
-                grain_id = Keys.Item3,
+                partition = partition,
+                grain_hash = hash,
+                grain_id = grainKey,
                 reminder_name = reminderName
             });
         }
 
-        public IStatement ReadReminderRows(GrainReference grainRef, IGrainReferenceConversionProvider grainReferenceConversionProvider)
+        internal IStatement ReadReminderRows(GrainReference grainRef, IGrainReferenceConversionProvider grainReferenceConversionProvider)
         {
-            var Keys = GetGrainKeys(grainRef, grainReferenceConversionProvider);
-            return queries["ReadReminderRowsKey"].Bind(new
+            var (partition, hash, grainKey) = GetGrainKeys(grainRef, grainReferenceConversionProvider);
+            return this["ReadReminderRowsKey"].Bind(new
             {
-                partition = Keys.Item1,
-                grain_hash = Keys.Item2,
-                grain_id = Keys.Item3,
+                partition = partition,
+                grain_hash = hash,
+                grain_id = grainKey,
             });
         }
 
-        public IStatement DeleteReminderRows()
+        internal IStatement DeleteReminderRows()
         {
-            return queries["DeleteReminderRowsKey"].Bind(null);
+            return this["DeleteReminderRowsKey"].Bind(null);
         }
 
-        public IStatement DeleteReminderRow(GrainReference grainRef, string reminderName, Guid expectedETag, IGrainReferenceConversionProvider grainReferenceConversionProvider)
+        internal IStatement DeleteReminderRow(GrainReference grainRef, string reminderName, Guid expectedETag, IGrainReferenceConversionProvider grainReferenceConversionProvider)
         {
             var Keys = GetGrainKeys(grainRef, grainReferenceConversionProvider);
-            return queries["DeleteReminderRowKey"].Bind(new
+            return this["DeleteReminderRowKey"].Bind(new
             {
                 partition = Keys.Item1,
                 grain_hash = Keys.Item2,
@@ -142,47 +100,40 @@ namespace OrleansCassandraUtils.Utils
 
         sbyte[] GetPartitionsForRange(uint grainHashStart, uint grainHashEnd)
         {
-            var FirstPartition = GetPartitionFromGrainHash(GetGrainHashForDatabase(grainHashStart));
-            var LastPartition = GetPartitionFromGrainHash(GetGrainHashForDatabase(grainHashEnd));
+            var firstPartition = GetPartitionFromGrainHash(GetGrainHashForDatabase(grainHashStart));
+            var lastPartition = GetPartitionFromGrainHash(GetGrainHashForDatabase(grainHashEnd));
 
-            var Partitions = new sbyte[LastPartition - FirstPartition + 1];
-            for (sbyte i = FirstPartition; i <= LastPartition; ++i)
-                Partitions[i - FirstPartition] = i;
+            var partitions = new sbyte[lastPartition - firstPartition + 1];
+            for (sbyte i = firstPartition; i <= lastPartition; ++i)
+                partitions[i - firstPartition] = i;
 
-            return Partitions;
+            return partitions;
         }
 
-        public IStatement ReadRemindersInsideRange(uint grainHashStart, uint grainHashEnd)
-        {
-            return queries["ReadRemindersInsideRangeKey"].Bind(new
+        internal IStatement ReadRemindersInsideRange(uint grainHashStart, uint grainHashEnd) =>
+            this["ReadRemindersInsideRangeKey"].Bind(new
             {
                 partitions = GetPartitionsForRange(grainHashStart, grainHashEnd),
                 grain_hash_start = GetGrainHashForDatabase(grainHashStart),
                 grain_hash_end = GetGrainHashForDatabase(grainHashEnd)
             });
-        }
 
-        public IStatement ReadRemindersOutsideRange1(uint grainHashStart)
-        {
-            return queries["ReadRemindersOutsideRangeKey1"].Bind(new
+        internal IStatement ReadRemindersOutsideRange1(uint grainHashStart) =>
+            this["ReadRemindersOutsideRangeKey1"].Bind(new
             {
                 partitions = GetPartitionsForRange(grainHashStart, uint.MaxValue),
                 grain_hash_start = GetGrainHashForDatabase(grainHashStart)
             });
-        }
 
-        public IStatement ReadRemindersOutsideRange2(uint grainHashEnd)
-        {
-            return queries["ReadRemindersOutsideRangeKey2"].Bind(new
+        internal IStatement ReadRemindersOutsideRange2(uint grainHashEnd) =>
+            this["ReadRemindersOutsideRangeKey2"].Bind(new
             {
                 partitions = GetPartitionsForRange(uint.MinValue, grainHashEnd),
                 grain_hash_end = GetGrainHashForDatabase(grainHashEnd)
             });
-        }
 
-        public IStatement InsertMembership(MembershipEntry membershipEntry, int version)
-        {
-            return queries["InsertMembershipKey"].Bind(new
+        internal IStatement InsertMembership(MembershipEntry membershipEntry, int version) =>
+            this["InsertMembershipKey"].Bind(new
             {
                 address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
                 port = membershipEntry.SiloAddress.Endpoint.Port,
@@ -196,32 +147,30 @@ namespace OrleansCassandraUtils.Utils
                 new_version = version + 1,
                 expected_version = version
             });
-        }
 
-        public IStatement InsertMembershipVersion()
-        {
-            return queries["InsertMembershipVersionKey"].Bind(null);
-        }
+        internal IStatement InsertMembershipVersion() => this["InsertMembershipVersionKey"].Bind(null);
 
-        public IStatement DeleteMembershipTableEntries()
-        {
-            return queries["DeleteMembershipTableEntriesKey"].Bind(null);
-        }
+        internal IStatement DeleteMembershipTableEntries() => this["DeleteMembershipTableEntriesKey"].Bind(null);
 
-        public IStatement UpdateIAmAliveTime(MembershipEntry membershipEntry)
-        {
-            return queries["UpdateIAmAliveTimeKey"].Bind(new
+        internal IStatement UpdateIAmAliveTime(MembershipEntry membershipEntry) =>
+            this["UpdateIAmAliveTimeKey"].Bind(new
             {
                 i_am_alive_time = membershipEntry.IAmAliveTime,
                 address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
                 port = membershipEntry.SiloAddress.Endpoint.Port,
                 generation = membershipEntry.SiloAddress.Generation
             });
-        }
 
-        public IStatement UpdateMembership(MembershipEntry membershipEntry, int version)
-        {
-            return queries["UpdateMembershipKey"].Bind(new
+        internal IStatement DeleteMembershipEntry(MembershipEntry membershipEntry) =>
+            this["DeleteMembershipEntryKey"].Bind(new
+            {
+                address = membershipEntry.SiloAddress.Endpoint.Address.ToString(),
+                port = membershipEntry.SiloAddress.Endpoint.Port,
+                generation = membershipEntry.SiloAddress.Generation
+            });
+
+        internal IStatement UpdateMembership(MembershipEntry membershipEntry, int version) =>
+            this["UpdateMembershipKey"].Bind(new
             {
                 new_version = version + 1,
                 expected_version = version,
@@ -232,48 +181,30 @@ namespace OrleansCassandraUtils.Utils
                 port = membershipEntry.SiloAddress.Endpoint.Port,
                 generation = membershipEntry.SiloAddress.Generation
             });
-        }
 
-        public IStatement MembershipReadVersion()
-        {
-            return queries["MembershipReadVersionKey"].Bind(null);
-        }
+        internal IStatement MembershipReadVersion() => this["MembershipReadVersionKey"].Bind(null);
 
-        public IStatement MembershipReadAll()
-        {
-            return queries["MembershipReadAllKey"].Bind(null);
-        }
+        internal IStatement MembershipReadAll() => this["MembershipReadAllKey"].Bind(null);
 
-        public IStatement MembershipReadRow(SiloAddress siloAddress)
-        {
-            return queries["MembershipReadRowKey"].Bind(new
+        internal IStatement MembershipReadRow(SiloAddress siloAddress) =>
+            this["MembershipReadRowKey"].Bind(new
             {
                 address = siloAddress.Endpoint.Address.ToString(),
                 port = siloAddress.Endpoint.Port,
                 generation = siloAddress.Generation
             });
-        }
 
-        public IStatement GatewaysQuery(int status)
-        {
-            return queries["GatewaysQueryKey"].Bind(new
-            {
-                status = status
-            });
-        }
+        internal IStatement GatewaysQuery(int status) => this["GatewaysQueryKey"].Bind(new { status = status });
 
-        public IStatement ReadFromStorage(string GrainType, byte[] GrainId)
-        {
-            return queries["ReadFromStorageKey"].Bind(new
+        internal IStatement ReadFromStorage(string GrainType, byte[] GrainId) =>
+            this["ReadFromStorageKey"].Bind(new
             {
                 grain_type = GrainType,
                 grain_id = GrainId
             });
-        }
 
-        public IStatement WriteToStorage(string GrainType, byte[] GrainId, byte[] Data, sbyte SerializerCode, Guid NewETag, Guid? ExpectedETag)
-        {
-            return queries["WriteToStorageKey"].Bind(new
+        internal IStatement WriteToStorage(string GrainType, byte[] GrainId, byte[] Data, sbyte SerializerCode, Guid NewETag, Guid? ExpectedETag) =>
+            this["WriteToStorageKey"].Bind(new
             {
                 grain_type = GrainType,
                 grain_id = GrainId,
@@ -282,16 +213,13 @@ namespace OrleansCassandraUtils.Utils
                 etag = NewETag,
                 expected_etag = ExpectedETag
             });
-        }
 
-        public IStatement ClearStorage(string GrainType, byte[] GrainId, Guid ExpectedETag)
-        {
-            return queries["ClearStorageKey"].Bind(new
+        internal IStatement ClearStorage(string GrainType, byte[] GrainId, Guid ExpectedETag) =>
+            this["ClearStorageKey"].Bind(new
             {
                 grain_type = GrainType,
                 grain_id = GrainId,
                 expected_etag = ExpectedETag
             });
-        }
     }
 }

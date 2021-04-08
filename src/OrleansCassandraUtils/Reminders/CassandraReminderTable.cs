@@ -1,15 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
+using Cassandra;
+using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using OrleansCassandraUtils.Utils;
-using Cassandra;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace OrleansCassandraUtils.Reminders
 {
@@ -21,16 +18,10 @@ namespace OrleansCassandraUtils.Reminders
         OrleansQueries queries;
 
 
-        public CassandraReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<CassandraReminderTableOptions> options)
+        public CassandraReminderTable(IGrainReferenceConverter grainReferenceConverter, IOptions<CassandraReminderTableOptions> options, IGrainReferenceConversionProvider grainReferenceConversionProvider = null)
         {
             this.options = options.Value;
-            this.grainReferenceConversionProvider = new DefaultGrainReferenceConversionProvider(grainReferenceConverter);
-        }
-
-        public CassandraReminderTable(IGrainReferenceConversionProvider grainReferenceConversionProvider, IOptions<CassandraReminderTableOptions> options)
-        {
-            this.options = options.Value;
-            this.grainReferenceConversionProvider = grainReferenceConversionProvider;
+            this.grainReferenceConversionProvider = grainReferenceConversionProvider ?? new DefaultGrainReferenceConversionProvider(grainReferenceConverter);
         }
 
         public async Task Init()

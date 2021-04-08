@@ -1,13 +1,7 @@
-﻿using Orleans.Serialization;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Orleans;
-using Orleans.Providers;
+﻿using System;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Providers;
+using Orleans.Serialization;
 
 namespace OrleansCassandraUtils.Persistence
 {

@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using System;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Orleans;
@@ -11,11 +12,6 @@ using Orleans.Storage;
 using OrleansCassandraUtils.Clustering;
 using OrleansCassandraUtils.Persistence;
 using OrleansCassandraUtils.Reminders;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace OrleansCassandraUtils
 {
@@ -36,6 +32,28 @@ namespace OrleansCassandraUtils
         }
 
         public static ISiloHostBuilder UseCassandraClustering(this ISiloHostBuilder builder, Action<OptionsBuilder<CassandraClusteringOptions>> configureOptions)
+        {
+            return builder.ConfigureServices(
+                services =>
+                {
+                    configureOptions?.Invoke(services.AddOptions<CassandraClusteringOptions>());
+                    services.AddSingleton<IMembershipTable, CassandraClusteringTable>();
+                });
+        }
+
+        public static ISiloBuilder UseCassandraClustering(this ISiloBuilder builder, Action<CassandraClusteringOptions> configureOptions)
+        {
+            return builder.ConfigureServices(
+                services =>
+                {
+                    if (configureOptions != null)
+                        services.Configure(configureOptions);
+
+                    services.AddSingleton<IMembershipTable, CassandraClusteringTable>();
+                });
+        }
+
+        public static ISiloBuilder UseCassandraClustering(this ISiloBuilder builder, Action<OptionsBuilder<CassandraClusteringOptions>> configureOptions)
         {
             return builder.ConfigureServices(
                 services =>
@@ -81,6 +99,16 @@ namespace OrleansCassandraUtils
             return builder.ConfigureServices(services => services.UseCassandraReminderService(configureOptions));
         }
 
+        public static ISiloBuilder UseCassandraReminderService(this ISiloBuilder builder, Action<CassandraReminderTableOptions> configureOptions)
+        {
+            return builder.UseCassandraReminderService(ob => ob.Configure(configureOptions));
+        }
+
+        public static ISiloBuilder UseCassandraReminderService(this ISiloBuilder builder, Action<OptionsBuilder<CassandraReminderTableOptions>> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.UseCassandraReminderService(configureOptions));
+        }
+
         public static IServiceCollection UseCassandraReminderService(this IServiceCollection services, Action<OptionsBuilder<CassandraReminderTableOptions>> configureOptions)
         {
             services.AddSingleton<IReminderTable, CassandraReminderTable>();
@@ -109,6 +137,26 @@ namespace OrleansCassandraUtils
         }
 
         public static ISiloHostBuilder AddCassandraGrainStorage(this ISiloHostBuilder builder, string name, Action<OptionsBuilder<CassandraGrainStorageOptions>> configureOptions = null)
+        {
+            return builder.ConfigureServices(services => services.AddCassandraGrainStorage(name, configureOptions));
+        }
+
+        public static ISiloBuilder AddCassandraGrainStorageAsDefault(this ISiloBuilder builder, Action<CassandraGrainStorageOptions> configureOptions)
+        {
+            return builder.AddCassandraGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        }
+
+        public static ISiloBuilder AddCassandraGrainStorage(this ISiloBuilder builder, string name, Action<CassandraGrainStorageOptions> configureOptions)
+        {
+            return builder.ConfigureServices(services => services.AddCassandraGrainStorage(name, configureOptions));
+        }
+
+        public static ISiloBuilder AddCassandraGrainStorageAsDefault(this ISiloBuilder builder, Action<OptionsBuilder<CassandraGrainStorageOptions>> configureOptions = null)
+        {
+            return builder.AddCassandraGrainStorage(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME, configureOptions);
+        }
+
+        public static ISiloBuilder AddCassandraGrainStorage(this ISiloBuilder builder, string name, Action<OptionsBuilder<CassandraGrainStorageOptions>> configureOptions = null)
         {
             return builder.ConfigureServices(services => services.AddCassandraGrainStorage(name, configureOptions));
         }
