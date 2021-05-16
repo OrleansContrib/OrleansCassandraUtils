@@ -20,8 +20,8 @@ namespace OrleansCassandraUtils.Persistence
     {
         public static IGrainStorage Create(IServiceProvider services, string name)
         {
-            IOptionsSnapshot<CassandraGrainStorageOptions> optionsSnapshot = services.GetRequiredService<IOptionsSnapshot<CassandraGrainStorageOptions>>();
-            return ActivatorUtilities.CreateInstance<CassandraGrainStorage>(services, Options.Create(optionsSnapshot.Get(name)), name);
+            IOptionsMonitor<CassandraGrainStorageOptions> optionsMonitor = services.GetRequiredService<IOptionsMonitor<CassandraGrainStorageOptions>>();
+            return ActivatorUtilities.CreateInstance<CassandraGrainStorage>(services, Options.Create(optionsMonitor.Get(name)), name);
         }
     }
 
